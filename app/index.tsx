@@ -7,6 +7,7 @@ import {
     ActivityIndicator,
     Pressable,
     ScrollView,
+    TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSpotifyAuth } from '../hooks/useSpotifyAuth';
@@ -22,6 +23,20 @@ export default function LoginScreen() {
         useSpotifyAuth();
     const [user, setUser] = useState<SpotifyUser | null>(null);
     const [fetchingProfile, setFetchingProfile] = useState(false);
+    const [profileError, setProfileError] = useState<string | null>(null);
+
+    // Mock login pour debug (uniquement en dev)
+    const mockLogin = () => {
+        const mockUser: SpotifyUser = {
+            id: 'mock-user-id',
+            display_name: 'Test Debug',
+            email: 'debug@example.com',
+            images: [],
+            country: 'FR'
+        };
+        setAuth('mock-token', mockUser);
+        router.replace('/session-management');
+    };
 
     // ─── Récupère le profil dès qu'on a un token ─────────────────────────────
 
@@ -30,77 +45,24 @@ export default function LoginScreen() {
         (async () => {
             setFetchingProfile(true);
             try {
+                setProfileError(null);
                 const profile = await getUserProfile(accessToken);
                 setUser(profile);
                 setAuth(accessToken, profile);
+
+                // Navigation automatique
+                router.replace('/session-management');
             } catch (e) {
                 console.error('[PROFILE] Erreur:', e);
+                setProfileError(e instanceof Error ? e.message : 'Impossible de charger le profil');
+                logout(); // On déconnecte si le profil échoue (403 probable)
             } finally {
                 setFetchingProfile(false);
             }
         })();
-    }, [accessToken, setAuth]);
+    }, [accessToken, setAuth, router, logout]);
 
-    // ─── Render : profil connecté ─────────────────────────────────────────────
-
-    if (accessToken && (fetchingProfile || user)) {
-        return (
-            <View style={styles.container}>
-                {fetchingProfile ? (
-                    <ActivityIndicator color={Colors.spotifyGreen} size="large" />
-                ) : user ? (
-                    <View style={styles.profileContainer}>
-                        {/* Avatar */}
-                        {user.images?.[0]?.url ? (
-                            <Image source={{ uri: user.images[0].url }} style={styles.avatar} />
-                        ) : (
-                            <View style={styles.avatarPlaceholder}>
-                                <Text style={styles.avatarInitial}>
-                                    {user.display_name?.[0]?.toUpperCase() ?? '?'}
-                                </Text>
-                            </View>
-                        )}
-
-                        {/* Infos */}
-                        <View style={styles.successBadge}>
-                            <Text style={styles.successEmoji}>✅</Text>
-                            <Text style={styles.successText}>Connecté à Spotify</Text>
-                        </View>
-
-                        <Text style={styles.userName}>{user.display_name}</Text>
-                        <Text style={styles.userEmail}>{user.email}</Text>
-
-                        {/* Token debug (visible en dev) */}
-                        <View style={styles.tokenBox}>
-                            <Text style={styles.tokenLabel}>Access Token (debug)</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                <Text style={styles.tokenText} numberOfLines={1}>
-                                    {accessToken.slice(0, 40)}…
-                                </Text>
-                            </ScrollView>
-                        </View>
-
-                        {/* Bouton continuer (Étape 4) */}
-                        <Pressable
-                            style={styles.continueButton}
-                            onPress={() => {
-                                router.push('/session-management');
-                            }}
-                        >
-                            <Text style={styles.continueLabel}>Continuer →</Text>
-                        </Pressable>
-
-                        {/* Déconnexion */}
-                        <Pressable onPress={() => { logout(); setUser(null); }} style={styles.logoutBtn}>
-                            <Text style={styles.logoutText}>Se déconnecter</Text>
-                        </Pressable>
-                    </View>
-                ) : null}
-            </View>
-        );
-    }
-
-    // ─── Render : écran de login ──────────────────────────────────────────────
+    // ─── Render principal ───────────────────────────────────────────────────
 
     return (
         <View style={styles.container}>
@@ -118,38 +80,60 @@ export default function LoginScreen() {
                     </Text>
                 </View>
 
-                {/* Description */}
-                <View style={styles.features}>
-                    {[
-                        { emoji: '🎧', text: 'Swipez les playlists de vos amis' },
-                        { emoji: '❤️', text: 'Matchez sur les morceaux communs' },
-                        { emoji: '🎶', text: 'Créez une playlist partagée Spotify' },
-                    ].map((f) => (
-                        <View key={f.text} style={styles.featureRow}>
-                            <Text style={styles.featureEmoji}>{f.emoji}</Text>
-                            <Text style={styles.featureText}>{f.text}</Text>
+                {fetchingProfile ? (
+                    <ActivityIndicator color={Colors.spotifyGreen} size="large" />
+                ) : accessToken && user ? (
+                    <View style={styles.profileContainer}>
+                        <View style={styles.successBadge}>
+                            <Text style={styles.successEmoji}>✅</Text>
+                            <Text style={styles.successText}>Connecté : {user.display_name}</Text>
                         </View>
-                    ))}
-                </View>
+                        <ActivityIndicator color={Colors.spotifyGreen} size="small" style={{ marginTop: 10 }} />
+                        <Text style={styles.tagline}>Redirection en cours...</Text>
+                    </View>
+                ) : (
+                    <>
+                        {/* Description */}
+                        <View style={styles.features}>
+                            {[
+                                { emoji: '🎧', text: 'Swipez les playlists de vos amis' },
+                                { emoji: '❤️', text: 'Matchez sur les morceaux communs' },
+                                { emoji: '🎶', text: 'Créez une playlist partagée Spotify' },
+                            ].map((f) => (
+                                <View key={f.text} style={styles.featureRow}>
+                                    <Text style={styles.featureEmoji}>{f.emoji}</Text>
+                                    <Text style={styles.featureText}>{f.text}</Text>
+                                </View>
+                            ))}
+                        </View>
 
-                {/* Bouton connexion */}
-                <SpotifyButton
-                    onPress={login}
-                    isLoading={isLoading || !isReady}
-                    disabled={!isReady}
-                />
+                        {/* Bouton connexion */}
+                        <SpotifyButton
+                            onPress={login}
+                            isLoading={isLoading || !isReady}
+                            disabled={!isReady}
+                        />
 
-                {/* Erreur */}
-                {error ? (
-                    <Text style={styles.errorText}>⚠️ {error}</Text>
-                ) : null}
-
-                {/* Debug redirect URI */}
-                {__DEV__ && (
-                    <Text style={styles.debugText}>
-                        Redirect: {redirectUri}
-                    </Text>
+                        {/* Debug Mock Login */}
+                        {__DEV__ && (
+                            <TouchableOpacity onPress={mockLogin} style={styles.debugBtn}>
+                                <Text style={styles.debugBtnText}>🔧 Debug: Utiliser un profil de test</Text>
+                            </TouchableOpacity>
+                        )}
+                    </>
                 )}
+
+                {/* Erreurs */}
+                {(error || profileError) ? (
+                    <View style={styles.errorBox}>
+                        <Text style={styles.errorText}>⚠️ Erreur : {error || profileError}</Text>
+                        {profileError?.includes('403') && (
+                            <Text style={styles.errorHint}>
+                                Assurez-vous d'avoir ajouté votre compte dans le Spotify Developer Dashboard.
+                            </Text>
+                        )}
+                    </View>
+                ) : null}
             </View>
         </View>
     );
@@ -190,6 +174,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 32,
         gap: 32,
+        width: '100%',
     },
 
     // ── Logo ──────────────────────────────────────────────────────────────────
@@ -214,83 +199,50 @@ const styles = StyleSheet.create({
     featureEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
     featureText: { color: Colors.textSecondary, fontSize: 15 },
 
-    // ── Erreur / debug ────────────────────────────────────────────────────────
-    errorText: {
-        color: Colors.swipeLeft,
-        fontSize: 13,
-        textAlign: 'center',
-        paddingHorizontal: 16,
-    },
-    debugText: {
-        color: Colors.textMuted,
-        fontSize: 10,
-        textAlign: 'center',
-    },
-
     // ── Profil connecté ───────────────────────────────────────────────────────
-    profileContainer: { alignItems: 'center', gap: 16, paddingHorizontal: 32 },
-    avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 3,
-        borderColor: Colors.spotifyGreen,
-    },
-    avatarPlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: Colors.card,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 3,
-        borderColor: Colors.spotifyGreen,
-    },
-    avatarInitial: {
-        fontSize: 36,
-        fontWeight: '800',
-        color: Colors.textPrimary,
-    },
+    profileContainer: { alignItems: 'center', gap: 12, width: '100%' },
     successBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
         backgroundColor: Colors.card,
-        paddingVertical: 6,
-        paddingHorizontal: 14,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         borderRadius: 20,
     },
     successEmoji: { fontSize: 14 },
-    successText: { color: Colors.spotifyGreen, fontSize: 13, fontWeight: '600' },
-    userName: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: Colors.textPrimary,
+    successText: { color: Colors.spotifyGreen, fontSize: 14, fontWeight: '600' },
+
+    // ── Erreurs ─────────────────────────────────────────────────────────────
+    errorBox: {
+        backgroundColor: 'rgba(255, 68, 68, 0.1)',
+        padding: 16,
+        borderRadius: 12,
+        width: '100%',
+        gap: 8,
+        marginTop: 10,
+    },
+    errorText: {
+        color: Colors.swipeLeft,
+        fontSize: 14,
         textAlign: 'center',
+        fontWeight: '600',
     },
-    userEmail: { fontSize: 14, color: Colors.textSecondary },
-    tokenBox: {
-        backgroundColor: Colors.surface,
-        borderRadius: 8,
-        padding: 12,
-        alignSelf: 'stretch',
-        gap: 4,
-    },
-    tokenLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: '600' },
-    tokenText: {
-        color: Colors.spotifyGreen,
+    errorHint: {
+        color: Colors.textSecondary,
         fontSize: 12,
-        fontFamily: 'monospace',
+        textAlign: 'center',
+        lineHeight: 18,
     },
-    continueButton: {
-        backgroundColor: Colors.spotifyGreen,
-        borderRadius: 50,
-        paddingVertical: 14,
-        paddingHorizontal: 40,
-        alignSelf: 'stretch',
-        alignItems: 'center',
+
+    // ── Debug ───────────────────────────────────────────────────────────────
+    debugBtn: {
+        marginTop: 8,
+        padding: 12,
     },
-    continueLabel: { color: '#000', fontSize: 16, fontWeight: '700' },
-    logoutBtn: { marginTop: 4 },
-    logoutText: { color: Colors.textMuted, fontSize: 13, textDecorationLine: 'underline' },
+    debugBtnText: {
+        color: Colors.textMuted,
+        fontSize: 12,
+        textDecorationLine: 'underline',
+    },
 });

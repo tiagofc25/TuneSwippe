@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import Swiper from 'react-native-deck-swiper';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, AudioSource } from 'expo-audio';
 import { useAuth } from '../context/AuthContext';
 import { getPlaylistTracks, SpotifyTrack } from '../services/spotify';
 import { TrackCard } from '../components/TrackCard';
@@ -21,6 +21,7 @@ import { supabase } from '../lib/supabase';
 const { width } = Dimensions.get('window');
 
 export default function SwipeScreen() {
+    const player = useAudioPlayer('');
     const router = useRouter();
     const {
         accessToken,
@@ -35,8 +36,7 @@ export default function SwipeScreen() {
     const [waitingForPartner, setWaitingForPartner] = useState(false);
     const [index, setIndex] = useState(0);
 
-    // Audio state
-    const soundRef = useRef<Audio.Sound | null>(null);
+    // Audio logic is now handled by player
 
     // ─── Phase 1: Identify Partner Playlist ───────────────────────────────────
 
@@ -115,29 +115,17 @@ export default function SwipeScreen() {
     // ─── Audio Logic ──────────────────────────────────────────────────────────
 
     const stopAudio = async () => {
-        if (soundRef.current) {
-            try {
-                await soundRef.current.stopAsync();
-                await soundRef.current.unloadAsync();
-                soundRef.current = null;
-            } catch (e) {
-                console.log('[AUDIO_STOP_ERR]', e);
-            }
-        }
+        player.pause();
     };
 
     const playAudio = async (trackIndex: number) => {
-        await stopAudio();
-
         const track = tracks[trackIndex];
         if (!track?.preview_url) return;
 
         try {
-            const { sound } = await Audio.Sound.createAsync(
-                { uri: track.preview_url },
-                { shouldPlay: true, isLooping: true }
-            );
-            soundRef.current = sound;
+            player.replace({ uri: track.preview_url });
+            player.play();
+            player.loop = true;
         } catch (e) {
             console.log('[AUDIO_PLAY_ERR]', e);
         }

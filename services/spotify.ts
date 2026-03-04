@@ -41,7 +41,9 @@ export async function getUserProfile(token: string): Promise<SpotifyUser> {
         headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
-        throw new Error(`Spotify API error: ${response.status}`);
+        const errorBody = await response.text();
+        console.error(`[SPOTIFY_PROFILE_ERROR] ${response.status} - ${errorBody}`);
+        throw new Error(`Spotify API error: ${response.status} - ${errorBody}`);
     }
     return response.json();
 }

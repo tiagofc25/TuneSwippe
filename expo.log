@@ -1,0 +1,10 @@
+  --non-interactive is not supported, use $CI=1 instead
+env: load .env
+env: export EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_URL
+Starting project at /Users/space/TuneSwippe
+Starting Metro Bundler
+
+Unable to run simctl:
+Error: xcrun simctl help exited with non-zero code: 72
+Waiting on http://localhost:8081
+Logs for your project will appear below.
