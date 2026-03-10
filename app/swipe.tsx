@@ -27,15 +27,20 @@ export default function SwipeScreen() {
         user,
         sessionId,
         setPartnerPlaylistId,
-        partnerPlaylistId
+        partnerPlaylistId,
     } = useAuth();
 
     const [tracks, setTracks] = useState<MusicTrack[]>([]);
     const [loading, setLoading] = useState(true);
+    const [tracksError, setTracksError] = useState<string | null>(null);
     const [waitingForPartner, setWaitingForPartner] = useState(false);
     const [index, setIndex] = useState(0);
 
-    // ─── Phase 1: Identify Partner Playlist ───────────────────────────────────
+    // Refs pour éviter les problèmes de closure stale dans les callbacks Realtime
+    const userRef = useRef(user);
+    useEffect(() => { userRef.current = user; }, [user]);
+
+    // ─── Phase 1: Vérifier que le partenaire a aussi choisi sa playlist ───────
 
     useEffect(() => {
         if (!accessToken || !sessionId || !user) {
@@ -43,44 +48,62 @@ export default function SwipeScreen() {
             return;
         }
 
-        const fetchSession = async () => {
+        let pollingInterval: ReturnType<typeof setInterval> | null = null;
+        let isMounted = true;
+
+        const checkPartnerReady = async () => {
             if (accessToken === 'mock-token') {
                 setPartnerPlaylistId('mock-partner-p2');
                 setWaitingForPartner(false);
-                return;
+                return true;
             }
-            console.log('[SWIPE] Fetching session:', sessionId);
+
             const { data: session, error } = await supabase
                 .from('sessions')
-                .select('*')
+                .select('user1_id, user1_playlist_id, user2_playlist_id')
                 .eq('id', sessionId)
                 .single();
 
             if (error || !session) {
                 console.error('[SWIPE] Session fetch error:', error);
-                return;
+                return false;
             }
 
-            console.log('[SWIPE] Session data:', {
-                id: session.id,
-                user1_playlist_id: session.user1_playlist_id,
-                user2_playlist_id: session.user2_playlist_id
-            });
+            const currentUser = userRef.current;
+            if (!currentUser) return false;
 
-            const isHost = session.user1_id === user.id;
+            const isHost = session.user1_id === currentUser.id;
+            // On récupère l'ID de la playlist du partenaire uniquement pour savoir s'il est prêt
+            const partnerReady = isHost ? !!session.user2_playlist_id : !!session.user1_playlist_id;
             const pId = isHost ? session.user2_playlist_id : session.user1_playlist_id;
 
-            console.log('[SWIPE] Am I host?', isHost, '| Partner Playlist ID:', pId);
+            console.log('[SWIPE] Am I host?', isHost, '| Partner ready?', partnerReady);
 
-            if (pId) {
+            if (partnerReady && isMounted) {
                 setPartnerPlaylistId(pId);
                 setWaitingForPartner(false);
-            } else {
+                return true;
+            } else if (isMounted) {
                 setWaitingForPartner(true);
+                return false;
             }
+            return false;
         };
 
-        fetchSession();
+        // Première vérification
+        checkPartnerReady().then(found => {
+            if (!found && isMounted) {
+                // Polling de secours toutes les 3 secondes
+                pollingInterval = setInterval(async () => {
+                    console.log('[SWIPE] Polling for partner...');
+                    const ready = await checkPartnerReady();
+                    if (ready && pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                    }
+                }, 3000);
+            }
+        });
 
         // Écouter les changements en temps réel
         const channel = supabase
@@ -91,42 +114,54 @@ export default function SwipeScreen() {
                 (payload: any) => {
                     console.log('[SWIPE] Realtime update received:', payload.new);
                     const session = payload.new;
-                    const isHost = session.user1_id === user.id;
+                    const currentUser = userRef.current;
+                    if (!currentUser) return;
+
+                    const isHost = session.user1_id === currentUser.id;
                     const pId = isHost ? session.user2_playlist_id : session.user1_playlist_id;
 
-                    console.log('[SWIPE] Realtime pId check:', pId);
-                    if (pId) {
+                    if (pId && isMounted) {
                         setPartnerPlaylistId(pId);
                         setWaitingForPartner(false);
+                        if (pollingInterval) {
+                            clearInterval(pollingInterval);
+                            pollingInterval = null;
+                        }
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status: string) => {
+                console.log('[SWIPE] Realtime subscription status:', status);
+            });
 
         return () => {
+            isMounted = false;
+            if (pollingInterval) clearInterval(pollingInterval);
             supabase.removeChannel(channel);
         };
     }, [accessToken, sessionId]);
 
-    // ─── Phase 2: Fetch Partner Tracks ────────────────────────────────────────
+    // ─── Phase 2: Fetch les tracks de la playlist du PARTENAIRE ────────────────
+    // Les playlists sont publiques (filtrées lors de la sélection), donc accessibles avec n'importe quel token.
 
     useEffect(() => {
-        if (!partnerPlaylistId || !accessToken) return;
+        if (!partnerPlaylistId || !accessToken || waitingForPartner) return;
 
         (async () => {
             setLoading(true);
+            setTracksError(null);
             try {
-                if (accessToken) {
-                    const data = await getSpotifyTracks(accessToken, partnerPlaylistId, 50);
-                    setTracks(data);
-                }
+                console.log('[SWIPE] Fetching PARTNER playlist tracks:', partnerPlaylistId);
+                const data = await getSpotifyTracks(accessToken, partnerPlaylistId, 50);
+                setTracks(data);
             } catch (err) {
                 console.error('[FETCH_PARTNER_TRACKS]', err);
+                setTracksError("Impossible de charger la playlist du partenaire. Elle est peut-être privée ou inaccessible.");
             } finally {
                 setLoading(false);
             }
         })();
-    }, [partnerPlaylistId, accessToken]);
+    }, [partnerPlaylistId, accessToken, waitingForPartner]);
 
     // ─── Swiper Handlers ───────────────────────────────────────────────────────
 
@@ -174,15 +209,6 @@ export default function SwipeScreen() {
                     Dès qu'il l'aura fait, tu pourras swiper !
                 </Text>
                 <ActivityIndicator color={Colors.spotifyGreen} style={{ marginTop: 24 }} />
-                <TouchableOpacity
-                    onPress={() => {
-                        console.log('[SWIPE] Manual refresh requested');
-                        router.replace('/swipe');
-                    }}
-                    style={styles.refreshBtn}
-                >
-                    <Text style={styles.refreshBtnText}>🔄 Rafraîchir manuellement</Text>
-                </TouchableOpacity>
             </View>
         );
     }
@@ -191,7 +217,23 @@ export default function SwipeScreen() {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator color={Colors.spotifyGreen} size="large" />
-                <Text style={styles.loadingText}>Récupération de sa playlist...</Text>
+                <Text style={styles.loadingText}>Chargement de ta playlist...</Text>
+            </View>
+        );
+    }
+
+    if (tracksError) {
+        return (
+            <View style={styles.centered}>
+                <Text style={styles.emoji}>😕</Text>
+                <Text style={styles.title}>Oups !</Text>
+                <Text style={styles.subtitle}>{tracksError}</Text>
+                <MusicButton
+                    onPress={() => router.replace('/playlist-select')}
+                    label="Choisir une autre playlist"
+                    style={{ marginTop: 24 }}
+                    variant={'spotify'}
+                />
             </View>
         );
     }
@@ -410,18 +452,5 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 24,
     },
-    refreshBtn: {
-        marginTop: 32,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 50,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.border,
-    },
-    refreshBtnText: {
-        color: Colors.textPrimary,
-        fontSize: 14,
-        fontWeight: '600',
-    },
+
 });

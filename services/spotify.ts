@@ -18,6 +18,7 @@ export interface SpotifyPlaylist {
     owner: { display_name: string };
     trackCount: number;
     ownerName: string;
+    isPublic: boolean;
     service: 'spotify';
 }
 
@@ -71,6 +72,7 @@ export async function getUserPlaylists(
                 owner: { display_name: 'Test User' },
                 trackCount: 10,
                 ownerName: 'Test User',
+                isPublic: true,
                 service: 'spotify'
             },
             {
@@ -82,6 +84,7 @@ export async function getUserPlaylists(
                 owner: { display_name: 'Test User' },
                 trackCount: 5,
                 ownerName: 'Test User',
+                isPublic: true,
                 service: 'spotify'
             }
         ];
@@ -97,12 +100,15 @@ export async function getUserPlaylists(
         throw new Error(`Spotify API error: ${response.status} - ${errorBody}`);
     }
     const data = await response.json();
-    return data.items.map((item: any) => ({
-        ...item,
-        trackCount: item.tracks?.total || 0,
-        ownerName: item.owner?.display_name || '',
-        service: 'spotify'
-    }));
+    return data.items
+        .filter((item: any) => item.public === true)
+        .map((item: any) => ({
+            ...item,
+            trackCount: item.tracks?.total || 0,
+            ownerName: item.owner?.display_name || '',
+            isPublic: true,
+            service: 'spotify'
+        }));
 }
 
 // ─── Morceaux d'une playlist (50 premiers) ──────────────────────────────────

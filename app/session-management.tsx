@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -19,13 +19,81 @@ import { MusicButton } from '../components/MusicButton';
 
 export default function SessionManagementScreen() {
     const router = useRouter();
-    const { user, setSessionId, setRoomCode } = useAuth();
+    const { user, setSessionId, setRoomCode, sessionId } = useAuth();
 
     const [mode, setMode] = useState<'root' | 'create' | 'join' | 'code-display'>('root');
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [generatedCode, setGeneratedCode] = useState('');
+    const [partnerJoined, setPartnerJoined] = useState(false);
+
+    // ─── Realtime + Polling: écouter quand le partenaire rejoint la room ─────
+
+    useEffect(() => {
+        if (!sessionId || mode !== 'code-display') return;
+
+        let isMounted = true;
+        let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
+        const checkPartnerJoined = async () => {
+            const { data: session, error: err } = await supabase
+                .from('sessions')
+                .select('user2_id')
+                .eq('id', sessionId)
+                .single();
+
+            if (!err && session?.user2_id && isMounted) {
+                setPartnerJoined(true);
+                console.log('[SESSION] Partenaire a rejoint la room (polling) !');
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+                return true;
+            }
+            return false;
+        };
+
+        // Polling de secours toutes les 3 secondes
+        pollingInterval = setInterval(() => {
+            console.log('[SESSION] Polling for partner join...');
+            checkPartnerJoined();
+        }, 3000);
+
+        // Écouter les changements en temps réel (Supabase Realtime)
+        const channel = supabase
+            .channel(`session-waiting-${sessionId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'sessions',
+                    filter: `id=eq.${sessionId}`,
+                },
+                (payload: any) => {
+                    console.log('[SESSION] Realtime update:', payload.new);
+                    if (payload.new.user2_id && isMounted) {
+                        setPartnerJoined(true);
+                        console.log('[SESSION] Partenaire a rejoint la room (realtime) !');
+                        if (pollingInterval) {
+                            clearInterval(pollingInterval);
+                            pollingInterval = null;
+                        }
+                    }
+                }
+            )
+            .subscribe((status: string) => {
+                console.log('[SESSION] Realtime subscription status:', status);
+            });
+
+        return () => {
+            isMounted = false;
+            if (pollingInterval) clearInterval(pollingInterval);
+            supabase.removeChannel(channel);
+        };
+    }, [sessionId, mode]);
 
     // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -167,11 +235,27 @@ export default function SessionManagementScreen() {
             >
                 <Text style={styles.copyBtnText}>📋 Copier le code</Text>
             </TouchableOpacity>
-            <MusicButton
-                onPress={() => router.push('/playlist-select')}
-                label="Continuer →"
-                variant="default"
-            />
+
+            {partnerJoined ? (
+                <>
+                    <Text style={styles.partnerJoinedText}>✅ Ton partenaire a rejoint la room !</Text>
+                    <MusicButton
+                        onPress={() => router.push('/playlist-select')}
+                        label="Continuer →"
+                        variant="default"
+                    />
+                </>
+            ) : (
+                <>
+                    <ActivityIndicator color={Colors.spotifyGreen} style={{ marginTop: 8 }} />
+                    <Text style={styles.waitingText}>En attente du partenaire...</Text>
+                    <MusicButton
+                        onPress={() => router.push('/playlist-select')}
+                        label="Continuer sans attendre →"
+                        variant="default"
+                    />
+                </>
+            )}
         </View>
     );
 
@@ -322,6 +406,18 @@ const styles = StyleSheet.create({
     errorText: {
         color: Colors.swipeLeft,
         marginTop: 20,
+        textAlign: 'center',
+    },
+    partnerJoinedText: {
+        color: Colors.spotifyGreen,
+        fontSize: 16,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    waitingText: {
+        color: Colors.textSecondary,
+        fontSize: 14,
         textAlign: 'center',
     },
 });

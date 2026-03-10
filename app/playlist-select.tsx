@@ -114,9 +114,10 @@ export default function PlaylistSelectScreen() {
             />
 
             <View style={styles.header}>
-                <Text style={styles.title}>Tes Playlists</Text>
+                <Text style={styles.title}>Tes Playlists publiques</Text>
                 <Text style={styles.subtitle}>
-                    Sélectionne la playlist que tu veux faire écouter à ton partenaire.
+                    Sélectionne la playlist que tu veux faire écouter à ton partenaire.{'\n'}
+                    Seules les playlists publiques sont affichées pour que ton partenaire puisse y accéder.
                 </Text>
             </View>
 
@@ -148,7 +149,10 @@ export default function PlaylistSelectScreen() {
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     ListEmptyComponent={
                         <View style={styles.centered}>
-                            <Text style={styles.emptyText}>Aucune playlist trouvée sur ton compte Spotify.</Text>
+                            <Text style={styles.emptyText}>
+                                Aucune playlist publique trouvée.{'\n\n'}
+                                Rends au moins une de tes playlists publique dans Spotify pour pouvoir la partager avec ton partenaire.
+                            </Text>
                         </View>
                     }
                 />

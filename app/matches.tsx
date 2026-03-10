@@ -38,6 +38,31 @@ export default function MatchesScreen() {
         }
 
         fetchMatches();
+
+        // Écouter les nouveaux swipes en temps réel pour mettre à jour les matchs automatiquement
+        const channel = supabase
+            .channel(`swipes-matches-${sessionId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'swipes',
+                    filter: `session_id=eq.${sessionId}`,
+                },
+                (payload: any) => {
+                    console.log('[MATCHES] Nouveau swipe détecté en temps réel:', payload.new);
+                    // Re-calculer les matchs à chaque nouveau swipe "right"
+                    if (payload.new.direction === 'right') {
+                        fetchMatches();
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [sessionId]);
 
     const fetchMatches = async () => {
@@ -73,11 +98,8 @@ export default function MatchesScreen() {
                 return;
             }
 
-            // 3. Récupérer les détails des tracks depuis Spotify
-            // Comme on a déjà les tracks dans nos playlists, on pourrait les stocker ou les refetch
-            // Pour faire simple et propre, on va refetch les tracks des deux playlists concernées
-            // et filtrer celles qui sont dans matchedIds.
-
+            // 3. Récupérer les détails des tracks depuis les deux playlists (publiques).
+            // Les deux playlists sont publiques donc accessibles avec n'importe quel token.
             const [myTracks, partnerTracks] = await Promise.all([
                 (mySelectedPlaylist && accessToken)
                     ? getSpotifyTracks(accessToken, mySelectedPlaylist.id)
