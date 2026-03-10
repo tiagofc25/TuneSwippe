@@ -10,18 +10,17 @@ import {
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import Swiper from 'react-native-deck-swiper';
-import { useAudioPlayer, AudioSource } from 'expo-audio';
 import { useAuth } from '../context/AuthContext';
-import { getPlaylistTracks, SpotifyTrack } from '../services/spotify';
+import { getPlaylistTracks as getSpotifyTracks } from '../services/spotify';
+import { MusicTrack } from '../services/musicTypes';
 import { TrackCard } from '../components/TrackCard';
 import { Colors } from '../constants/Colors';
-import { SpotifyButton } from '../components/SpotifyButton';
+import { MusicButton } from '../components/MusicButton';
 import { supabase } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
 export default function SwipeScreen() {
-    const player = useAudioPlayer('');
     const router = useRouter();
     const {
         accessToken,
@@ -31,12 +30,10 @@ export default function SwipeScreen() {
         partnerPlaylistId
     } = useAuth();
 
-    const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
+    const [tracks, setTracks] = useState<MusicTrack[]>([]);
     const [loading, setLoading] = useState(true);
     const [waitingForPartner, setWaitingForPartner] = useState(false);
     const [index, setIndex] = useState(0);
-
-    // Audio logic is now handled by player
 
     // ─── Phase 1: Identify Partner Playlist ───────────────────────────────────
 
@@ -47,19 +44,37 @@ export default function SwipeScreen() {
         }
 
         const fetchSession = async () => {
+            if (accessToken === 'mock-token') {
+                setPartnerPlaylistId('mock-partner-p2');
+                setWaitingForPartner(false);
+                return;
+            }
+            console.log('[SWIPE] Fetching session:', sessionId);
             const { data: session, error } = await supabase
                 .from('sessions')
                 .select('*')
                 .eq('id', sessionId)
                 .single();
 
-            if (error || !session) return;
+            if (error || !session) {
+                console.error('[SWIPE] Session fetch error:', error);
+                return;
+            }
+
+            console.log('[SWIPE] Session data:', {
+                id: session.id,
+                user1_playlist_id: session.user1_playlist_id,
+                user2_playlist_id: session.user2_playlist_id
+            });
 
             const isHost = session.user1_id === user.id;
             const pId = isHost ? session.user2_playlist_id : session.user1_playlist_id;
 
+            console.log('[SWIPE] Am I host?', isHost, '| Partner Playlist ID:', pId);
+
             if (pId) {
                 setPartnerPlaylistId(pId);
+                setWaitingForPartner(false);
             } else {
                 setWaitingForPartner(true);
             }
@@ -74,9 +89,12 @@ export default function SwipeScreen() {
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
                 (payload: any) => {
+                    console.log('[SWIPE] Realtime update received:', payload.new);
                     const session = payload.new;
                     const isHost = session.user1_id === user.id;
                     const pId = isHost ? session.user2_playlist_id : session.user1_playlist_id;
+
+                    console.log('[SWIPE] Realtime pId check:', pId);
                     if (pId) {
                         setPartnerPlaylistId(pId);
                         setWaitingForPartner(false);
@@ -98,44 +116,17 @@ export default function SwipeScreen() {
         (async () => {
             setLoading(true);
             try {
-                const data = await getPlaylistTracks(accessToken, partnerPlaylistId, 50);
-                setTracks(data);
+                if (accessToken) {
+                    const data = await getSpotifyTracks(accessToken, partnerPlaylistId, 50);
+                    setTracks(data);
+                }
             } catch (err) {
                 console.error('[FETCH_PARTNER_TRACKS]', err);
             } finally {
                 setLoading(false);
             }
         })();
-
-        return () => {
-            stopAudio();
-        };
     }, [partnerPlaylistId, accessToken]);
-
-    // ─── Audio Logic ──────────────────────────────────────────────────────────
-
-    const stopAudio = async () => {
-        player.pause();
-    };
-
-    const playAudio = async (trackIndex: number) => {
-        const track = tracks[trackIndex];
-        if (!track?.preview_url) return;
-
-        try {
-            player.replace({ uri: track.preview_url });
-            player.play();
-            player.loop = true;
-        } catch (e) {
-            console.log('[AUDIO_PLAY_ERR]', e);
-        }
-    };
-
-    useEffect(() => {
-        if (tracks.length > 0 && !loading) {
-            playAudio(index);
-        }
-    }, [index, tracks, loading]);
 
     // ─── Swiper Handlers ───────────────────────────────────────────────────────
 
@@ -143,7 +134,7 @@ export default function SwipeScreen() {
         setIndex(prev => prev + 1);
     };
 
-    const saveSwipe = async (track: SpotifyTrack, direction: 'left' | 'right') => {
+    const saveSwipe = async (track: MusicTrack, direction: 'left' | 'right') => {
         if (!sessionId || !user) return;
 
         try {
@@ -183,6 +174,15 @@ export default function SwipeScreen() {
                     Dès qu'il l'aura fait, tu pourras swiper !
                 </Text>
                 <ActivityIndicator color={Colors.spotifyGreen} style={{ marginTop: 24 }} />
+                <TouchableOpacity
+                    onPress={() => {
+                        console.log('[SWIPE] Manual refresh requested');
+                        router.replace('/swipe');
+                    }}
+                    style={styles.refreshBtn}
+                >
+                    <Text style={styles.refreshBtnText}>🔄 Rafraîchir manuellement</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -265,10 +265,11 @@ export default function SwipeScreen() {
                             Tu as parcouru toute la playlist du partenaire.
                             Découvre maintenant vos coups de cœur communs !
                         </Text>
-                        <SpotifyButton
+                        <MusicButton
                             onPress={() => router.push('/matches')}
                             label="Voir les Matchs ❤️"
                             style={{ marginTop: 24, width: '100%' }}
+                            variant={'spotify'}
                         />
                         <TouchableOpacity
                             onPress={() => router.replace('/playlist-select')}
@@ -408,5 +409,19 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
         lineHeight: 24,
+    },
+    refreshBtn: {
+        marginTop: 32,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 50,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    refreshBtnText: {
+        color: Colors.textPrimary,
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

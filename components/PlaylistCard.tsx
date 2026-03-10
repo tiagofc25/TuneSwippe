@@ -6,12 +6,12 @@ import {
     Image,
     StyleSheet,
 } from 'react-native';
-import { SpotifyPlaylist } from '../services/spotify';
+import { MusicPlaylist } from '../services/musicTypes';
 import { Colors } from '../constants/Colors';
 
 interface PlaylistCardProps {
-    playlist: SpotifyPlaylist;
-    onSelect: (playlist: SpotifyPlaylist) => void;
+    playlist: MusicPlaylist;
+    onSelect: (playlist: MusicPlaylist) => void;
     isSelected?: boolean;
 }
 
@@ -21,7 +21,7 @@ export function PlaylistCard({
     isSelected = false,
 }: PlaylistCardProps) {
     const coverUrl = playlist.images?.[0]?.url;
-    const trackCount = playlist.tracks?.total ?? 0;
+    const trackCount = playlist.trackCount;
 
     return (
         <TouchableOpacity
@@ -44,8 +44,8 @@ export function PlaylistCard({
                     {playlist.name}
                 </Text>
                 <Text style={styles.meta} numberOfLines={1}>
-                    {playlist.owner?.display_name
-                        ? `par ${playlist.owner.display_name}  ·  `
+                    {playlist.ownerName
+                        ? `par ${playlist.ownerName}  ·  `
                         : ''}
                     {trackCount} morceaux
                 </Text>

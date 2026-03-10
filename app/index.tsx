@@ -11,58 +11,72 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSpotifyAuth } from '../hooks/useSpotifyAuth';
-import { SpotifyButton } from '../components/SpotifyButton';
-import { getUserProfile, SpotifyUser } from '../services/spotify';
+import { MusicButton } from '../components/MusicButton';
+import { getUserProfile } from '../services/spotify';
 import { Colors } from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { setAuth } = useAuth();
-    const { accessToken, isLoading, error, login, logout, redirectUri, isReady } =
-        useSpotifyAuth();
-    const [user, setUser] = useState<SpotifyUser | null>(null);
+
+    // Auth global
+    const { accessToken, user: authUser, setAuth } = useAuth();
+
+    // Hooks spécifiques
+    const {
+        accessToken: spotifyToken,
+        isLoading: isSpotifyLoading,
+        error: spotifyError,
+        login: loginSpotify,
+        isReady: isSpotifyReady
+    } = useSpotifyAuth();
+
     const [fetchingProfile, setFetchingProfile] = useState(false);
     const [profileError, setProfileError] = useState<string | null>(null);
 
+    // Effet pour synchroniser le token Spotify avec l'AuthContext global
+    useEffect(() => {
+        const syncAuth = async () => {
+            if (spotifyToken && !accessToken && !fetchingProfile) {
+                console.log('[LOGIN] Spotify token detected, fetching profile...');
+                setFetchingProfile(true);
+                setProfileError(null);
+                try {
+                    const profile = await getUserProfile(spotifyToken);
+                    console.log('[LOGIN] Profile fetched:', profile.display_name);
+                    setAuth(spotifyToken, profile);
+                } catch (err) {
+                    console.error('[LOGIN] Profile fetch failed:', err);
+                    setProfileError('Impossible de récupérer votre profil Spotify.');
+                } finally {
+                    setFetchingProfile(false);
+                }
+            }
+        };
+
+        syncAuth();
+    }, [spotifyToken, accessToken, setAuth, fetchingProfile]);
+
     // Mock login pour debug (uniquement en dev)
     const mockLogin = () => {
-        const mockUser: SpotifyUser = {
+        setAuth('mock-token', {
             id: 'mock-user-id',
             display_name: 'Test Debug',
             email: 'debug@example.com',
             images: [],
-            country: 'FR'
-        };
-        setAuth('mock-token', mockUser);
+            country: 'FR',
+            service: 'spotify'
+        });
         router.replace('/session-management');
     };
 
-    // ─── Récupère le profil dès qu'on a un token ─────────────────────────────
-
+    // Navigation automatique
     useEffect(() => {
-        if (!accessToken) return;
-        (async () => {
-            setFetchingProfile(true);
-            try {
-                setProfileError(null);
-                const profile = await getUserProfile(accessToken);
-                setUser(profile);
-                setAuth(accessToken, profile);
-
-                // Navigation automatique
-                router.replace('/session-management');
-            } catch (e) {
-                console.error('[PROFILE] Erreur:', e);
-                setProfileError(e instanceof Error ? e.message : 'Impossible de charger le profil');
-                logout(); // On déconnecte si le profil échoue (403 probable)
-            } finally {
-                setFetchingProfile(false);
-            }
-        })();
-    }, [accessToken, setAuth, router, logout]);
-
-    // ─── Render principal ───────────────────────────────────────────────────
+        if (accessToken) {
+            console.log('[LOGIN] Global accessToken detected, navigating...');
+            router.replace('/session-management');
+        }
+    }, [accessToken, router]);
 
     return (
         <View style={styles.container}>
@@ -80,13 +94,13 @@ export default function LoginScreen() {
                     </Text>
                 </View>
 
-                {fetchingProfile ? (
+                {fetchingProfile || isSpotifyLoading ? (
                     <ActivityIndicator color={Colors.spotifyGreen} size="large" />
-                ) : accessToken && user ? (
+                ) : accessToken && authUser ? (
                     <View style={styles.profileContainer}>
                         <View style={styles.successBadge}>
                             <Text style={styles.successEmoji}>✅</Text>
-                            <Text style={styles.successText}>Connecté : {user.display_name}</Text>
+                            <Text style={styles.successText}>Connecté : {authUser.display_name}</Text>
                         </View>
                         <ActivityIndicator color={Colors.spotifyGreen} size="small" style={{ marginTop: 10 }} />
                         <Text style={styles.tagline}>Redirection en cours...</Text>
@@ -98,7 +112,7 @@ export default function LoginScreen() {
                             {[
                                 { emoji: '🎧', text: 'Swipez les playlists de vos amis' },
                                 { emoji: '❤️', text: 'Matchez sur les morceaux communs' },
-                                { emoji: '🎶', text: 'Créez une playlist partagée Spotify' },
+                                { emoji: '🎶', text: 'Propulsé par Spotify' },
                             ].map((f) => (
                                 <View key={f.text} style={styles.featureRow}>
                                     <Text style={styles.featureEmoji}>{f.emoji}</Text>
@@ -107,33 +121,33 @@ export default function LoginScreen() {
                             ))}
                         </View>
 
-                        {/* Bouton connexion */}
-                        <SpotifyButton
-                            onPress={login}
-                            isLoading={isLoading || !isReady}
-                            disabled={!isReady}
-                        />
+                        {/* Boutons d'action */}
+                        <View style={styles.actions}>
+                            <MusicButton
+                                onPress={loginSpotify}
+                                isLoading={isSpotifyLoading}
+                                disabled={!isSpotifyReady}
+                                label="Connecter Spotify"
+                                variant="spotify"
+                            />
 
-                        {/* Debug Mock Login */}
-                        {__DEV__ && (
-                            <TouchableOpacity onPress={mockLogin} style={styles.debugBtn}>
-                                <Text style={styles.debugBtnText}>🔧 Debug: Utiliser un profil de test</Text>
-                            </TouchableOpacity>
-                        )}
+                            <Pressable onPress={mockLogin} style={styles.mockBtn}>
+                                <Text style={styles.mockBtnText}>
+                                    🔧 Debug: Utiliser un profil de test
+                                </Text>
+                            </Pressable>
+                        </View>
                     </>
                 )}
 
                 {/* Erreurs */}
-                {(error || profileError) ? (
+                {(spotifyError || profileError) && (
                     <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>⚠️ Erreur : {error || profileError}</Text>
-                        {profileError?.includes('403') && (
-                            <Text style={styles.errorHint}>
-                                Assurez-vous d'avoir ajouté votre compte dans le Spotify Developer Dashboard.
-                            </Text>
-                        )}
+                        <Text style={styles.errorText}>
+                            ⚠️ Erreur : {spotifyError || profileError}
+                        </Text>
                     </View>
-                ) : null}
+                )}
             </View>
         </View>
     );
@@ -173,7 +187,7 @@ const styles = StyleSheet.create({
     content: {
         alignItems: 'center',
         paddingHorizontal: 32,
-        gap: 32,
+        gap: 24,
         width: '100%',
     },
 
@@ -235,12 +249,17 @@ const styles = StyleSheet.create({
         lineHeight: 18,
     },
 
-    // ── Debug ───────────────────────────────────────────────────────────────
-    debugBtn: {
-        marginTop: 8,
-        padding: 12,
+    actions: {
+        width: '100%',
+        gap: 12,
+        alignItems: 'center',
     },
-    debugBtnText: {
+    // ── Actions ─────────────────────────────────────────────────────────────
+    mockBtn: {
+        marginTop: 10,
+        padding: 8,
+    },
+    mockBtnText: {
         color: Colors.textMuted,
         fontSize: 12,
         textDecorationLine: 'underline',

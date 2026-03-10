@@ -5,20 +5,20 @@ import React, {
     useCallback,
     ReactNode,
 } from 'react';
-import { SpotifyUser, SpotifyPlaylist } from '../services/spotify';
+import { MusicUser, MusicPlaylist } from '../services/musicTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AuthContextValue {
     // Auth
     accessToken: string | null;
-    user: SpotifyUser | null;
-    setAuth: (token: string, user: SpotifyUser) => void;
+    user: MusicUser | null;
+    setAuth: (token: string, user: MusicUser) => void;
     clearAuth: () => void;
 
     // Playlists
-    mySelectedPlaylist: SpotifyPlaylist | null;
-    setMySelectedPlaylist: (playlist: SpotifyPlaylist | null) => void;
+    mySelectedPlaylist: MusicPlaylist | null;
+    setMySelectedPlaylist: (playlist: MusicPlaylist | null) => void;
     partnerPlaylistId: string | null;
     setPartnerPlaylistId: (id: string | null) => void;
 
@@ -37,16 +37,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [accessToken, setAccessToken] = useState<string | null>(null);
-    const [user, setUser] = useState<SpotifyUser | null>(null);
+    const [user, setUser] = useState<MusicUser | null>(null);
     const [mySelectedPlaylist, setMySelectedPlaylist] =
-        useState<SpotifyPlaylist | null>(null);
+        useState<MusicPlaylist | null>(null);
     const [partnerPlaylistId, setPartnerPlaylistId] = useState<string | null>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [roomCode, setRoomCode] = useState<string | null>(null);
 
-    const setAuth = useCallback((token: string, spotifyUser: SpotifyUser) => {
+    const setAuth = useCallback((token: string, musicUser: MusicUser) => {
         setAccessToken(token);
-        setUser(spotifyUser);
+        setUser(musicUser);
     }, []);
 
     const clearAuth = useCallback(() => {

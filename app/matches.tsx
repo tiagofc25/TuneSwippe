@@ -14,19 +14,19 @@ import { useRouter, Stack } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
-    createSharedPlaylist,
-    addTracksToPlaylist,
-    SpotifyTrack,
-    getPlaylistTracks
+    createSharedPlaylist as createSpotifyPlaylist,
+    addTracksToPlaylist as addSpotifyTracks,
+    getPlaylistTracks as getSpotifyTracks
 } from '../services/spotify';
+import { MusicTrack } from '../services/musicTypes';
 import { Colors } from '../constants/Colors';
-import { SpotifyButton } from '../components/SpotifyButton';
+import { MusicButton } from '../components/MusicButton';
 
 export default function MatchesScreen() {
     const router = useRouter();
     const { accessToken, user, sessionId, mySelectedPlaylist, partnerPlaylistId } = useAuth();
 
-    const [matches, setMatches] = useState<SpotifyTrack[]>([]);
+    const [matches, setMatches] = useState<MusicTrack[]>([]);
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
     const [exportedId, setExportedId] = useState<string | null>(null);
@@ -80,17 +80,17 @@ export default function MatchesScreen() {
 
             const [myTracks, partnerTracks] = await Promise.all([
                 (mySelectedPlaylist && accessToken)
-                    ? getPlaylistTracks(accessToken, mySelectedPlaylist.id)
+                    ? getSpotifyTracks(accessToken, mySelectedPlaylist.id)
                     : Promise.resolve([]),
                 (partnerPlaylistId && accessToken)
-                    ? getPlaylistTracks(accessToken, partnerPlaylistId)
+                    ? getSpotifyTracks(accessToken, partnerPlaylistId)
                     : Promise.resolve([])
             ]);
 
             const allPossibleTracks = [...myTracks, ...partnerTracks];
             const uniqueMatchedTracks = matchedIds.map(id =>
                 allPossibleTracks.find(t => t.id === id)
-            ).filter(Boolean) as SpotifyTrack[];
+            ).filter(Boolean) as MusicTrack[];
 
             setMatches(uniqueMatchedTracks);
         } catch (err) {
@@ -105,14 +105,11 @@ export default function MatchesScreen() {
 
         setExporting(true);
         try {
-            // 1. Créer la playlist
             const playlistName = `TuneSwippe Match ❤️`;
-            const newPlaylist = await createSharedPlaylist(accessToken, user.id, playlistName);
 
-            // 2. Ajouter les tracks
-            const trackUris = matches.map(t => t.uri);
-            await addTracksToPlaylist(accessToken, newPlaylist.id, trackUris);
-
+            const newPlaylist = await createSpotifyPlaylist(accessToken, user.id, playlistName);
+            const trackUris = matches.map(t => (t as any).uri || '');
+            await addSpotifyTracks(accessToken, newPlaylist.id, trackUris);
             setExportedId(newPlaylist.id);
             Alert.alert("Succès !", "Ta playlist de matchs a été créée sur Spotify.");
         } catch (err) {
@@ -154,7 +151,10 @@ export default function MatchesScreen() {
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => (
                     <View style={styles.trackItem}>
-                        <Image source={{ uri: item.album.images[0]?.url }} style={styles.albumArt} />
+                        <Image
+                            source={{ uri: item.album?.images?.[0]?.url || (item as any).images?.[0]?.url }}
+                            style={styles.albumArt}
+                        />
                         <View style={styles.trackInfo}>
                             <Text style={styles.trackName} numberOfLines={1}>{item.name}</Text>
                             <Text style={styles.artistName} numberOfLines={1}>
@@ -171,10 +171,11 @@ export default function MatchesScreen() {
                         <Text style={styles.emptyText}>
                             Swippez tous les deux à droite sur les mêmes morceaux pour les voir ici !
                         </Text>
-                        <SpotifyButton
+                        <MusicButton
                             onPress={() => router.back()}
                             label="Continuer à swiper"
                             style={{ marginTop: 20 }}
+                            variant={'spotify'}
                         />
                     </View>
                 }
@@ -182,11 +183,12 @@ export default function MatchesScreen() {
 
             {matches.length > 0 && (
                 <View style={styles.footer}>
-                    <SpotifyButton
+                    <MusicButton
                         onPress={handleExport}
                         label={exportedId ? "Matchs exportés !" : "Exporter vers Spotify"}
                         isLoading={exporting}
                         disabled={!!exportedId}
+                        variant={'spotify'}
                     />
                 </View>
             )}

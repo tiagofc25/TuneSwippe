@@ -6,18 +6,18 @@ import {
     StyleSheet,
     Dimensions,
 } from 'react-native';
-import { SpotifyTrack } from '../services/spotify';
+import { MusicTrack } from '../services/musicTypes';
 import { Colors } from '../constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
 interface TrackCardProps {
-    track: SpotifyTrack;
+    track: MusicTrack;
 }
 
 export function TrackCard({ track }: TrackCardProps) {
-    const imageUrl = track.album?.images?.[0]?.url;
+    const imageUrl = track.album?.images?.[0]?.url || track.images?.[0]?.url;
 
     return (
         <View style={styles.card}>

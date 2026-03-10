@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'TuneSwippe',
   slug: 'tuneswippe',
+  owner: 'tiagofc25',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
@@ -35,7 +36,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
-    'expo-audio',
     [
       'expo-web-browser',
       {},

@@ -8,21 +8,24 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter, Stack } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
-import { SpotifyButton } from '../components/SpotifyButton';
+import { MusicButton } from '../components/MusicButton';
 
 export default function SessionManagementScreen() {
     const router = useRouter();
     const { user, setSessionId, setRoomCode } = useAuth();
 
-    const [mode, setMode] = useState<'root' | 'create' | 'join'>('root');
+    const [mode, setMode] = useState<'root' | 'create' | 'join' | 'code-display'>('root');
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [generatedCode, setGeneratedCode] = useState('');
 
     // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -55,8 +58,9 @@ export default function SessionManagementScreen() {
 
             setSessionId(data.id);
             setRoomCode(code);
+            setGeneratedCode(code);
+            setMode('code-display');
             console.log('[SESSION] Room créée:', code);
-            router.push('/playlist-select');
         } catch (err) {
             setError("Erreur lors de la création de la room");
             console.error(err);
@@ -114,10 +118,11 @@ export default function SessionManagementScreen() {
 
     const renderRoot = () => (
         <View style={styles.menu}>
-            <SpotifyButton
+            <MusicButton
                 onPress={() => setMode('create')}
                 label="Créer une Room"
                 style={styles.menuBtn}
+                variant="default"
             />
             <TouchableOpacity
                 onPress={() => setMode('join')}
@@ -133,14 +138,40 @@ export default function SessionManagementScreen() {
             <Text style={styles.infoText}>
                 Tu vas générer un code unique à partager avec ton partenaire.
             </Text>
-            <SpotifyButton
+            <MusicButton
                 onPress={handleCreateRoom}
                 label="Générer le code"
                 isLoading={loading}
+                variant="default"
             />
             <TouchableOpacity onPress={() => setMode('root')} style={styles.backBtn}>
                 <Text style={styles.backBtnText}>Retour</Text>
             </TouchableOpacity>
+        </View>
+    );
+
+    const renderCodeDisplay = () => (
+        <View style={styles.form}>
+            <Text style={styles.infoText}>
+                Partage ce code avec ton partenaire pour qu'il rejoigne la room :
+            </Text>
+            <View style={styles.codeBox}>
+                <Text style={styles.codeText}>{generatedCode}</Text>
+            </View>
+            <TouchableOpacity
+                style={styles.copyBtn}
+                onPress={async () => {
+                    await Clipboard.setStringAsync(generatedCode);
+                    Alert.alert('Copié !', 'Le code a été copié dans le presse-papier.');
+                }}
+            >
+                <Text style={styles.copyBtnText}>📋 Copier le code</Text>
+            </TouchableOpacity>
+            <MusicButton
+                onPress={() => router.push('/playlist-select')}
+                label="Continuer →"
+                variant="default"
+            />
         </View>
     );
 
@@ -158,11 +189,12 @@ export default function SessionManagementScreen() {
                 onChangeText={setInputValue}
                 maxLength={6}
             />
-            <SpotifyButton
+            <MusicButton
                 onPress={handleJoinRoom}
                 label="Rejoindre"
                 isLoading={loading}
                 disabled={inputValue.length < 6}
+                variant="default"
             />
             <TouchableOpacity onPress={() => setMode('root')} style={styles.backBtn}>
                 <Text style={styles.backBtnText}>Retour</Text>
@@ -184,6 +216,7 @@ export default function SessionManagementScreen() {
                 {mode === 'root' && renderRoot()}
                 {mode === 'create' && renderCreate()}
                 {mode === 'join' && renderJoin()}
+                {mode === 'code-display' && renderCodeDisplay()}
 
                 {error && <Text style={styles.errorText}>{error}</Text>}
             </View>
@@ -257,6 +290,34 @@ const styles = StyleSheet.create({
         color: Colors.textMuted,
         fontSize: 14,
         textDecorationLine: 'underline',
+    },
+    codeBox: {
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        paddingVertical: 24,
+        paddingHorizontal: 32,
+        borderWidth: 2,
+        borderColor: Colors.accent,
+        width: '100%',
+        alignItems: 'center',
+    },
+    codeText: {
+        fontSize: 36,
+        fontWeight: '900',
+        color: Colors.accent,
+        letterSpacing: 8,
+    },
+    copyBtn: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 50,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    copyBtnText: {
+        color: Colors.textPrimary,
+        fontSize: 14,
+        fontWeight: '600',
     },
     errorText: {
         color: Colors.swipeLeft,

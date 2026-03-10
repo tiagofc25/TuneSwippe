@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import { getUserPlaylists, SpotifyPlaylist } from '../services/spotify';
+import { getUserPlaylists as getSpotifyPlaylists } from '../services/spotify';
+import { MusicPlaylist } from '../services/musicTypes';
 import { PlaylistCard } from '../components/PlaylistCard';
 import { Colors } from '../constants/Colors';
 import { SpotifyButton } from '../components/SpotifyButton';
@@ -25,7 +26,7 @@ export default function PlaylistSelectScreen() {
         sessionId
     } = useAuth();
 
-    const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+    const [playlists, setPlaylists] = useState<MusicPlaylist[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -40,8 +41,10 @@ export default function PlaylistSelectScreen() {
 
         (async () => {
             try {
-                const data = await getUserPlaylists(accessToken, 50);
-                setPlaylists(data);
+                if (accessToken) {
+                    const data = await getSpotifyPlaylists(accessToken, 50);
+                    setPlaylists(data);
+                }
             } catch (err) {
                 setError("Impossible de récupérer vos playlists");
                 console.error(err);
@@ -49,11 +52,11 @@ export default function PlaylistSelectScreen() {
                 setIsLoading(false);
             }
         })();
-    }, [accessToken]);
+    }, [accessToken, router]);
 
     // ─── Actions ──────────────────────────────────────────────────────────────
 
-    const handleSelect = (playlist: SpotifyPlaylist) => {
+    const handleSelect = (playlist: MusicPlaylist) => {
         setMySelectedPlaylist(playlist);
     };
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -45,12 +45,17 @@ export function useSpotifyAuth() {
     });
 
     // Génère automatiquement le redirect URI adapté à l'environnement
-    // Sur simulateur/appareil: tuneswippe://callback
-    // Sur Expo Go: exp://...
     const redirectUri = AuthSession.makeRedirectUri({
         scheme: 'tuneswippe',
         path: 'callback',
     });
+
+    // Log demandé par l'utilisateur
+    console.log("MON URI DE REDIRECTION EST :", redirectUri);
+
+    useEffect(() => {
+        console.log('[AUTH] Current Redirect URI:', redirectUri);
+    }, [redirectUri]);
 
     const [request, response, promptAsync] = AuthSession.useAuthRequest(
         {
@@ -66,10 +71,17 @@ export function useSpotifyAuth() {
         discovery
     );
 
+    useEffect(() => {
+        if (request) {
+            console.log('[AUTH] Request created with redirectUri:', request.redirectUri);
+        }
+    }, [request]);
+
     // ─── Échange du code contre un token ──────────────────────────────────────
 
     const exchangeCodeForToken = useCallback(
         async (code: string, codeVerifier: string) => {
+            console.log('[AUTH] Exchanging code for token...');
             setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
 
             try {
@@ -87,13 +99,12 @@ export function useSpotifyAuth() {
 
                 if (!tokenResponse.ok) {
                     const errorData = await tokenResponse.json();
+                    console.error('[AUTH] Token response NOT OK:', errorData);
                     throw new Error(errorData.error_description || 'Token exchange failed');
                 }
 
                 const tokenData = await tokenResponse.json();
-
                 console.log('[AUTH] ✅ Token obtenu avec succès !');
-                console.log('[AUTH] Token:', tokenData.access_token?.slice(0, 20) + '...');
 
                 setAuthState({
                     accessToken: tokenData.access_token,
@@ -106,7 +117,7 @@ export function useSpotifyAuth() {
                 return tokenData.access_token as string;
             } catch (err) {
                 const message = err instanceof Error ? err.message : 'Erreur inconnue';
-                console.error('[AUTH] ❌ Erreur:', message);
+                console.error('[AUTH] ❌ Erreur échange token:', message);
                 setAuthState((prev) => ({
                     ...prev,
                     isLoading: false,
@@ -118,25 +129,48 @@ export function useSpotifyAuth() {
         [redirectUri]
     );
 
+    // ─── Effet pour gérer la réponse (plus fiable que promptAsync seul) ──────
+    useEffect(() => {
+        if (response) {
+            console.log('[AUTH] Response type received:', response.type);
+
+            if (response.type === 'success' && request?.codeVerifier) {
+                const { code } = response.params;
+                console.log('[AUTH] SUCCESS ! Code received, starting exchange...');
+                exchangeCodeForToken(code, request.codeVerifier);
+            } else if (response.type === 'error') {
+                console.error('[AUTH] Auth error response:', response.error);
+                setAuthState((prev) => ({
+                    ...prev,
+                    isLoading: false,
+                    error: response.error?.message || 'Erreur d\'authentification',
+                }));
+            } else if (response.type === 'cancel' || response.type === 'dismiss') {
+                console.log('[AUTH] User cancelled or dismissed the browser');
+                setAuthState((prev) => ({ ...prev, isLoading: false }));
+            }
+        }
+    }, [response, request, exchangeCodeForToken]);
+
     // ─── Lance le flux OAuth ───────────────────────────────────────────────────
 
     const login = useCallback(async () => {
-        if (!request) return;
-        setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
-        const result = await promptAsync();
-
-        if (result.type === 'success' && request.codeVerifier) {
-            await exchangeCodeForToken(result.params.code, request.codeVerifier);
-        } else if (result.type === 'error') {
-            setAuthState((prev) => ({
-                ...prev,
-                isLoading: false,
-                error: result.error?.message || 'Connexion annulée',
-            }));
-        } else if (result.type === 'cancel' || result.type === 'dismiss') {
-            setAuthState((prev) => ({ ...prev, isLoading: false }));
+        if (!request) {
+            console.warn('[AUTH] Request not ready');
+            return;
         }
-    }, [request, promptAsync, exchangeCodeForToken]);
+
+        console.log('[AUTH] Launching browser for login...');
+        setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+        try {
+            // On se fie principalement au useEffect sur 'response' pour traiter le résultat
+            await promptAsync();
+        } catch (err) {
+            console.error('[AUTH] Prompt async error:', err);
+            setAuthState((prev) => ({ ...prev, isLoading: false, error: 'Internal Error' }));
+        }
+    }, [request, promptAsync]);
 
     // ─── Déconnexion ──────────────────────────────────────────────────────────
 
@@ -154,7 +188,7 @@ export function useSpotifyAuth() {
         ...authState,
         login,
         logout,
-        redirectUri, // Utile pour debug
+        redirectUri,
         isReady: !!request,
     };
 }
