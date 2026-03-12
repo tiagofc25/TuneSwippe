@@ -118,6 +118,7 @@ export async function getPlaylistTracks(
     playlistId: string,
     limit = 50
 ): Promise<SpotifyTrack[]> {
+    console.log(`[SPOTIFY] Fetching tracks for playlist ${playlistId} with token ${token}`);
     if (token === 'mock-token') {
         return [
             {
@@ -149,6 +150,7 @@ export async function getPlaylistTracks(
         ];
     }
 
+    console.log(`[SPOTIFY] REQUEST URL - ${token}`, `${SPOTIFY_API_BASE}/playlists/${playlistId}/tracks?limit=${limit}&fields=items(track(id,name,artists,album,preview_url,duration_ms,uri))`);
     const response = await fetch(
         `${SPOTIFY_API_BASE}/playlists/${playlistId}/tracks?limit=${limit}&fields=items(track(id,name,artists,album,preview_url,duration_ms,uri))`,
         { headers: { Authorization: `Bearer ${token}` } }
