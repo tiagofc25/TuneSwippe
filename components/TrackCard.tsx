@@ -9,6 +9,7 @@ import {
 import { MusicTrack } from '../services/musicTypes';
 import { Colors } from '../constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,16 +18,25 @@ interface TrackCardProps {
 }
 
 export function TrackCard({ track }: TrackCardProps) {
-    const imageUrl = track.album?.images?.[0]?.url || track.images?.[0]?.url;
+    const imageUrl = track.album?.images?.[0]?.url || (track as any)?.images?.[0]?.url;
 
     return (
         <View style={styles.card}>
             {/* Background Cover Blurred (optionnel, pour le look premium) */}
-            <Image
-                source={{ uri: imageUrl }}
-                style={StyleSheet.absoluteFillObject}
-                blurRadius={50}
-            />
+            {imageUrl ? (
+                <Image
+                    source={{ uri: imageUrl }}
+                    style={StyleSheet.absoluteFillObject}
+                    blurRadius={50}
+                />
+            ) : (
+                <LinearGradient
+                    colors={['rgba(29,185,84,0.25)', 'rgba(255,107,138,0.18)', 'rgba(255,255,255,0.06)']}
+                    start={{ x: 0.1, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                />
+            )}
 
             {/* Dark Overlay */}
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
@@ -36,9 +46,16 @@ export function TrackCard({ track }: TrackCardProps) {
                 {imageUrl ? (
                     <Image source={{ uri: imageUrl }} style={styles.cover} resizeMode="cover" />
                 ) : (
-                    <View style={[styles.cover, styles.placeholder]}>
-                        <Text style={styles.placeholderEmoji}>🎸</Text>
-                    </View>
+                    <LinearGradient
+                        colors={['rgba(29,185,84,0.35)', 'rgba(29,185,84,0.12)', 'rgba(255,255,255,0.06)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.cover, styles.placeholder]}
+                    >
+                        <View style={styles.placeholderIconWrap}>
+                            <Ionicons name="musical-note" size={44} color="rgba(255,255,255,0.92)" />
+                        </View>
+                    </LinearGradient>
                 )}
             </View>
 
@@ -94,11 +111,21 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
     },
     placeholder: {
-        backgroundColor: Colors.card,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
+    },
+    placeholderIconWrap: {
+        width: 84,
+        height: 84,
+        borderRadius: 28,
+        backgroundColor: 'rgba(0,0,0,0.25)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    placeholderEmoji: { fontSize: 60 },
     gradient: {
         position: 'absolute',
         bottom: 0,

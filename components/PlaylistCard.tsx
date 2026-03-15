@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { MusicPlaylist } from '../services/musicTypes';
 import { Colors } from '../constants/Colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 interface PlaylistCardProps {
     playlist: MusicPlaylist;
@@ -33,9 +35,14 @@ export function PlaylistCard({
             {coverUrl ? (
                 <Image source={{ uri: coverUrl }} style={styles.cover} />
             ) : (
-                <View style={[styles.cover, styles.coverPlaceholder]}>
-                    <Text style={styles.coverEmoji}>🎵</Text>
-                </View>
+                <LinearGradient
+                    colors={['rgba(29,185,84,0.35)', 'rgba(255,255,255,0.06)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.cover, styles.coverPlaceholder]}
+                >
+                    <Ionicons name="musical-notes" size={22} color="rgba(255,255,255,0.92)" />
+                </LinearGradient>
             )}
 
             {/* Infos */}
@@ -59,7 +66,7 @@ export function PlaylistCard({
             {/* Indicateur sélection */}
             {isSelected && (
                 <View style={styles.checkBadge}>
-                    <Text style={styles.checkIcon}>✓</Text>
+                    <Ionicons name="checkmark" size={16} color="#0D0D0D" />
                 </View>
             )}
         </TouchableOpacity>
@@ -71,7 +78,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.surface,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 12,
         gap: 14,
         borderWidth: 1.5,
@@ -84,14 +91,14 @@ const styles = StyleSheet.create({
     cover: {
         width: 60,
         height: 60,
-        borderRadius: 8,
+        borderRadius: 14,
     },
     coverPlaceholder: {
-        backgroundColor: Colors.card,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
     },
-    coverEmoji: { fontSize: 26 },
     info: {
         flex: 1,
         gap: 3,
@@ -117,10 +124,5 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
-    },
-    checkIcon: {
-        color: '#000',
-        fontWeight: '800',
-        fontSize: 14,
     },
 });

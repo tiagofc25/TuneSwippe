@@ -104,7 +104,7 @@ export function useSpotifyAuth() {
                 }
 
                 const tokenData = await tokenResponse.json();
-                console.log('[AUTH] ✅ Token obtenu avec succès !');
+                console.log('[AUTH] Token obtenu avec succès');
 
                 setAuthState({
                     accessToken: tokenData.access_token,
@@ -117,7 +117,7 @@ export function useSpotifyAuth() {
                 return tokenData.access_token as string;
             } catch (err) {
                 const message = err instanceof Error ? err.message : 'Erreur inconnue';
-                console.error('[AUTH] ❌ Erreur échange token:', message);
+                console.error('[AUTH] Erreur échange token:', message);
                 setAuthState((prev) => ({
                     ...prev,
                     isLoading: false,

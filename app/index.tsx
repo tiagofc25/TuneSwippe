@@ -3,11 +3,8 @@ import {
     View,
     Text,
     StyleSheet,
-    Image,
     ActivityIndicator,
     Pressable,
-    ScrollView,
-    TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSpotifyAuth } from '../hooks/useSpotifyAuth';
@@ -15,6 +12,8 @@ import { MusicButton } from '../components/MusicButton';
 import { getUserProfile } from '../services/spotify';
 import { Colors } from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -65,7 +64,6 @@ export default function LoginScreen() {
             email: 'debug@example.com',
             images: [],
             country: 'FR',
-            service: 'spotify'
         });
         router.replace('/session-management');
     };
@@ -80,14 +78,25 @@ export default function LoginScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Cercles décoratifs */}
-            <View style={styles.circle1} />
-            <View style={styles.circle2} />
+            <LinearGradient
+                colors={['#0D0D0D', '#0B1210', '#0D0D0D']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
+            <LinearGradient
+                colors={['rgba(29,185,84,0.18)', 'rgba(29,185,84,0)', 'rgba(255,107,138,0.10)']}
+                start={{ x: 0.15, y: 0.05 }}
+                end={{ x: 0.95, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
 
             <View style={styles.content}>
                 {/* Logo / Titre */}
                 <View style={styles.logoArea}>
-                    <Text style={styles.logo}>🎵</Text>
+                    <View style={styles.logoMark}>
+                        <Ionicons name="musical-notes" size={22} color="#0D0D0D" />
+                    </View>
                     <Text style={styles.appName}>TuneSwippe</Text>
                     <Text style={styles.tagline}>
                         Trouvez vos coups de cœur musicaux communs
@@ -99,7 +108,7 @@ export default function LoginScreen() {
                 ) : accessToken && authUser ? (
                     <View style={styles.profileContainer}>
                         <View style={styles.successBadge}>
-                            <Text style={styles.successEmoji}>✅</Text>
+                            <Ionicons name="checkmark-circle" size={16} color={Colors.spotifyGreen} />
                             <Text style={styles.successText}>Connecté : {authUser.display_name}</Text>
                         </View>
                         <ActivityIndicator color={Colors.spotifyGreen} size="small" style={{ marginTop: 10 }} />
@@ -110,12 +119,12 @@ export default function LoginScreen() {
                         {/* Description */}
                         <View style={styles.features}>
                             {[
-                                { emoji: '🎧', text: 'Swipez les playlists de vos amis' },
-                                { emoji: '❤️', text: 'Matchez sur les morceaux communs' },
-                                { emoji: '🎶', text: 'Propulsé par Spotify' },
+                                { icon: <Feather name="layers" size={18} color={Colors.textPrimary} />, text: 'Swipez les playlists de vos amis' },
+                                { icon: <Ionicons name="heart" size={18} color={Colors.accentPink} />, text: 'Matchez sur les morceaux communs' },
+                                { icon: <MaterialCommunityIcons name="spotify" size={18} color={Colors.spotifyGreen} />, text: 'Propulsé par Spotify' },
                             ].map((f) => (
                                 <View key={f.text} style={styles.featureRow}>
-                                    <Text style={styles.featureEmoji}>{f.emoji}</Text>
+                                    <View style={styles.featureIcon}>{f.icon}</View>
                                     <Text style={styles.featureText}>{f.text}</Text>
                                 </View>
                             ))}
@@ -132,9 +141,10 @@ export default function LoginScreen() {
                             />
 
                             <Pressable onPress={mockLogin} style={styles.mockBtn}>
-                                <Text style={styles.mockBtnText}>
-                                    🔧 Debug: Utiliser un profil de test
-                                </Text>
+                                <View style={styles.mockRow}>
+                                    <Feather name="tool" size={14} color={Colors.textMuted} />
+                                    <Text style={styles.mockBtnText}>Debug : Utiliser un profil de test</Text>
+                                </View>
                             </Pressable>
                         </View>
                     </>
@@ -143,9 +153,10 @@ export default function LoginScreen() {
                 {/* Erreurs */}
                 {(spotifyError || profileError) && (
                     <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>
-                            ⚠️ Erreur : {spotifyError || profileError}
-                        </Text>
+                        <View style={styles.errorRow}>
+                            <Feather name="alert-triangle" size={16} color={Colors.swipeLeft} />
+                            <Text style={styles.errorText}>Erreur : {spotifyError || profileError}</Text>
+                        </View>
                     </View>
                 )}
             </View>
@@ -161,28 +172,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 
-    // ── Déco ──────────────────────────────────────────────────────────────────
-    circle1: {
-        position: 'absolute',
-        width: 350,
-        height: 350,
-        borderRadius: 175,
-        backgroundColor: Colors.spotifyGreen,
-        opacity: 0.05,
-        top: -80,
-        right: -80,
-    },
-    circle2: {
-        position: 'absolute',
-        width: 250,
-        height: 250,
-        borderRadius: 125,
-        backgroundColor: Colors.accentPink,
-        opacity: 0.05,
-        bottom: -40,
-        left: -60,
-    },
-
     // ── Contenu ───────────────────────────────────────────────────────────────
     content: {
         alignItems: 'center',
@@ -193,7 +182,19 @@ const styles = StyleSheet.create({
 
     // ── Logo ──────────────────────────────────────────────────────────────────
     logoArea: { alignItems: 'center', gap: 8 },
-    logo: { fontSize: 64 },
+    logoMark: {
+        width: 56,
+        height: 56,
+        borderRadius: 18,
+        backgroundColor: Colors.spotifyGreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.35,
+        shadowRadius: 18,
+        elevation: 12,
+    },
     appName: {
         fontSize: 36,
         fontWeight: '800',
@@ -210,7 +211,16 @@ const styles = StyleSheet.create({
     // ── Features ──────────────────────────────────────────────────────────────
     features: { gap: 14, alignSelf: 'stretch' },
     featureRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    featureEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
+    featureIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
     featureText: { color: Colors.textSecondary, fontSize: 15 },
 
     // ── Profil connecté ───────────────────────────────────────────────────────
@@ -219,12 +229,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: Colors.card,
+        backgroundColor: 'rgba(255,255,255,0.06)',
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
-    successEmoji: { fontSize: 14 },
     successText: { color: Colors.spotifyGreen, fontSize: 14, fontWeight: '600' },
 
     // ── Erreurs ─────────────────────────────────────────────────────────────
@@ -235,18 +246,15 @@ const styles = StyleSheet.create({
         width: '100%',
         gap: 8,
         marginTop: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,71,87,0.25)',
     },
+    errorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
     errorText: {
         color: Colors.swipeLeft,
         fontSize: 14,
         textAlign: 'center',
         fontWeight: '600',
-    },
-    errorHint: {
-        color: Colors.textSecondary,
-        fontSize: 12,
-        textAlign: 'center',
-        lineHeight: 18,
     },
 
     actions: {
@@ -259,6 +267,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
         padding: 8,
     },
+    mockRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     mockBtnText: {
         color: Colors.textMuted,
         fontSize: 12,

@@ -16,6 +16,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
 import { MusicButton } from '../components/MusicButton';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 export default function SessionManagementScreen() {
     const router = useRouter();
@@ -223,25 +225,67 @@ export default function SessionManagementScreen() {
             <Text style={styles.infoText}>
                 Partage ce code avec ton partenaire pour qu'il rejoigne la room :
             </Text>
-            <View style={styles.codeBox}>
-                <Text style={styles.codeText}>{generatedCode}</Text>
+            <View style={styles.ticketWrap}>
+                <LinearGradient
+                    colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.04)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.ticket}
+                >
+                    <View style={styles.ticketTopRow}>
+                        <View style={styles.ticketPill}>
+                            <Ionicons name="people" size={14} color={Colors.textPrimary} />
+                            <Text style={styles.ticketPillText}>ROOM</Text>
+                        </View>
+                        <View style={styles.ticketRight}>
+                            {partnerJoined ? (
+                                <View style={styles.statusRow}>
+                                    <Ionicons name="checkmark-circle" size={16} color={Colors.spotifyGreen} />
+                                    <Text style={styles.statusTextOk}>Connecté</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.statusRow}>
+                                    <ActivityIndicator color={Colors.textSecondary} size="small" />
+                                    <Text style={styles.statusTextIdle}>En attente</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    <View style={styles.codeRow}>
+                        <Text style={styles.codeText}>{generatedCode}</Text>
+                    </View>
+
+                    <View style={styles.ticketFooterRow}>
+                        <Text style={styles.ticketHint}>Valable pendant cette session</Text>
+                        <View style={styles.ticketDivider} />
+                        <Text style={styles.ticketHint}>Partage sécurisé</Text>
+                    </View>
+                </LinearGradient>
+
+                <View style={[styles.notch, styles.notchLeft]} />
+                <View style={[styles.notch, styles.notchRight]} />
             </View>
             <TouchableOpacity
                 style={styles.copyBtn}
                 onPress={async () => {
                     await Clipboard.setStringAsync(generatedCode);
-                    Alert.alert('Copié !', 'Le code a été copié dans le presse-papier.');
+                    Alert.alert('Copié', 'Le code a été copié dans le presse-papier.');
                 }}
             >
-                <Text style={styles.copyBtnText}>📋 Copier le code</Text>
+                <Feather name="copy" size={16} color={Colors.textPrimary} />
+                <Text style={styles.copyBtnText}>Copier le code</Text>
             </TouchableOpacity>
 
             {partnerJoined ? (
                 <>
-                    <Text style={styles.partnerJoinedText}>✅ Ton partenaire a rejoint la room !</Text>
+                    <View style={styles.partnerJoinedRow}>
+                        <Ionicons name="sparkles" size={16} color={Colors.spotifyGreen} />
+                        <Text style={styles.partnerJoinedText}>Ton partenaire a rejoint la room</Text>
+                    </View>
                     <MusicButton
                         onPress={() => router.push('/playlist-select')}
-                        label="Continuer →"
+                        label="Continuer"
                         variant="default"
                     />
                 </>
@@ -251,7 +295,7 @@ export default function SessionManagementScreen() {
                     <Text style={styles.waitingText}>En attente du partenaire...</Text>
                     <MusicButton
                         onPress={() => router.push('/playlist-select')}
-                        label="Continuer sans attendre →"
+                        label="Continuer sans attendre"
                         variant="default"
                     />
                 </>
@@ -294,7 +338,9 @@ export default function SessionManagementScreen() {
             <Stack.Screen options={{ headerShown: true, headerTitle: 'Room', headerTransparent: true, headerTintColor: '#FFF' }} />
 
             <View style={styles.content}>
-                <Text style={styles.emoji}>🏠</Text>
+                <View style={styles.heroIcon}>
+                    <Ionicons name="home" size={26} color={Colors.textPrimary} />
+                </View>
                 <Text style={styles.title}>Prêt à matcher ?</Text>
 
                 {mode === 'root' && renderRoot()}
@@ -320,7 +366,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         gap: 16,
     },
-    emoji: { fontSize: 64, marginBottom: 8 },
+    heroIcon: {
+        width: 72,
+        height: 72,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.35,
+        shadowRadius: 18,
+        elevation: 10,
+        marginBottom: 8,
+    },
     title: {
         fontSize: 32,
         fontWeight: '800',
@@ -375,15 +436,65 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textDecorationLine: 'underline',
     },
-    codeBox: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        paddingVertical: 24,
-        paddingHorizontal: 32,
-        borderWidth: 2,
-        borderColor: Colors.accent,
+    ticketWrap: {
         width: '100%',
+        marginTop: 2,
+    },
+    ticket: {
+        borderRadius: 22,
+        padding: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
+        overflow: 'hidden',
+    },
+    notch: {
+        position: 'absolute',
+        top: '50%',
+        width: 18,
+        height: 18,
+        marginTop: -9,
+        borderRadius: 9,
+        backgroundColor: Colors.background,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    notchLeft: { left: -9 },
+    notchRight: { right: -9 },
+    ticketTopRow: {
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+    ticketPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        backgroundColor: 'rgba(255,255,255,0.07)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    ticketPillText: {
+        color: Colors.textSecondary,
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 1,
+    },
+    ticketRight: { alignItems: 'flex-end' },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    statusTextOk: { color: Colors.spotifyGreen, fontSize: 12, fontWeight: '800' },
+    statusTextIdle: { color: Colors.textSecondary, fontSize: 12, fontWeight: '800' },
+    codeRow: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 18,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.22)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
     codeText: {
         fontSize: 36,
@@ -391,12 +502,33 @@ const styles = StyleSheet.create({
         color: Colors.accent,
         letterSpacing: 8,
     },
+    ticketFooterRow: {
+        marginTop: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+    ticketHint: {
+        color: Colors.textMuted,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    ticketDivider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+    },
     copyBtn: {
         paddingVertical: 12,
         paddingHorizontal: 24,
         borderRadius: 50,
         borderWidth: 1,
         borderColor: Colors.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(255,255,255,0.04)',
     },
     copyBtnText: {
         color: Colors.textPrimary,
@@ -411,10 +543,10 @@ const styles = StyleSheet.create({
     partnerJoinedText: {
         color: Colors.spotifyGreen,
         fontSize: 16,
-        fontWeight: '700',
+        fontWeight: '800',
         textAlign: 'center',
-        marginTop: 8,
     },
+    partnerJoinedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
     waitingText: {
         color: Colors.textSecondary,
         fontSize: 14,
