@@ -74,6 +74,10 @@ export default function PlaylistSelectScreen() {
     setError(null);
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7522/ingest/134acb57-3a1e-4ed4-8bfe-f0da0ec2cb26',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a20dc2'},body:JSON.stringify({sessionId:'a20dc2',runId:'pre-fix',hypothesisId:'B',location:'app/playlist-select.tsx:handleContinue:entry',message:'enter handleContinue',data:{playlistId:mySelectedPlaylist.id,ownerId:mySelectedPlaylist.ownerId ?? null,userId:user.id,hasAccessToken:!!accessToken},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+
       // Diagnostic: si le propriétaire réel de la playlist ne correspond pas au compte connecté,
       // Spotify peut refuser l'accès aux tracks même si la playlist semble visible.
       if (
@@ -100,6 +104,9 @@ export default function PlaylistSelectScreen() {
         tokenProvider,
         50
       );
+      // #region agent log
+      fetch('http://127.0.0.1:7522/ingest/134acb57-3a1e-4ed4-8bfe-f0da0ec2cb26',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a20dc2'},body:JSON.stringify({sessionId:'a20dc2',runId:'pre-fix',hypothesisId:'D',location:'app/playlist-select.tsx:handleContinue:afterTracks',message:'tracks fetched',data:{playlistId:mySelectedPlaylist.id,tracksLen:tracks.length,firstId:tracks[0]?.id ? String(tracks[0].id).slice(0,32) : null,firstUriPrefix:tracks[0]?.uri ? String(tracks[0].uri).slice(0,24) : null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
 
       // 2. Déterminer si on est l'hôte (user1) ou l'invité (user2)
       const { data: session, error: fetchErr } = await supabase
@@ -114,6 +121,9 @@ export default function PlaylistSelectScreen() {
       const updateData = isHost
         ? { user1_playlist_id: mySelectedPlaylist.id, user1_tracks: tracks }
         : { user2_playlist_id: mySelectedPlaylist.id, user2_tracks: tracks };
+      // #region agent log
+      fetch('http://127.0.0.1:7522/ingest/134acb57-3a1e-4ed4-8bfe-f0da0ec2cb26',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a20dc2'},body:JSON.stringify({sessionId:'a20dc2',runId:'pre-fix',hypothesisId:'E',location:'app/playlist-select.tsx:handleContinue:beforeUpdate',message:'about to update session tracks',data:{sessionId,isHost,tracksLen:tracks.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
 
       // 3. Stocker l'ID ET les tracks sérialisées dans Supabase
       const { error: updateErr } = await supabase
@@ -131,6 +141,9 @@ export default function PlaylistSelectScreen() {
       router.push("/swipe");
     } catch (err) {
       console.error(err);
+      // #region agent log
+      fetch('http://127.0.0.1:7522/ingest/134acb57-3a1e-4ed4-8bfe-f0da0ec2cb26',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a20dc2'},body:JSON.stringify({sessionId:'a20dc2',runId:'pre-fix',hypothesisId:'D',location:'app/playlist-select.tsx:handleContinue:catch',message:'caught error in handleContinue',data:{name:(err as any)?.name ?? null,code:(err as any)?.code ?? null,message:(err as any)?.message ?? String(err)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       const anyErr = err as any;
       if (
         anyErr?.code === "PGRST204" &&
