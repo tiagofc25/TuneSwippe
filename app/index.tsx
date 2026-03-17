@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSpotifyAuth } from '../hooks/useSpotifyAuth';
 import { MusicButton } from '../components/MusicButton';
-import { getUserProfile } from '../services/spotify';
+import { getUserProfile } from '../services/spotifyService';
 import { Colors } from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,15 +19,16 @@ export default function LoginScreen() {
     const router = useRouter();
 
     // Auth global
-    const { accessToken, user: authUser, setAuth } = useAuth();
+    const { accessToken, user: authUser, setAuth, clearAuth } = useAuth();
 
     // Hooks spécifiques
     const {
-        accessToken: spotifyToken,
         isLoading: isSpotifyLoading,
         error: spotifyError,
         login: loginSpotify,
-        isReady: isSpotifyReady
+        isReady: isSpotifyReady,
+        isAuthenticated,
+        getValidToken,
     } = useSpotifyAuth();
 
     const [fetchingProfile, setFetchingProfile] = useState(false);
@@ -36,14 +37,17 @@ export default function LoginScreen() {
     // Effet pour synchroniser le token Spotify avec l'AuthContext global
     useEffect(() => {
         const syncAuth = async () => {
-            if (spotifyToken && !accessToken && !fetchingProfile) {
-                console.log('[LOGIN] Spotify token detected, fetching profile...');
+            if (isAuthenticated && !accessToken && !fetchingProfile) {
+                console.log('[LOGIN] Spotify authenticated, fetching profile...');
                 setFetchingProfile(true);
                 setProfileError(null);
                 try {
-                    const profile = await getUserProfile(spotifyToken);
+                    const profile = await getUserProfile(getValidToken);
                     console.log('[LOGIN] Profile fetched:', profile.display_name);
-                    setAuth(spotifyToken, profile);
+                    const token = await getValidToken();
+                    if (token) {
+                        setAuth(token, profile);
+                    }
                 } catch (err) {
                     console.error('[LOGIN] Profile fetch failed:', err);
                     setProfileError('Impossible de récupérer votre profil Spotify.');
@@ -54,7 +58,7 @@ export default function LoginScreen() {
         };
 
         syncAuth();
-    }, [spotifyToken, accessToken, setAuth, fetchingProfile]);
+    }, [isAuthenticated, accessToken, setAuth, fetchingProfile, getValidToken]);
 
     // Mock login pour debug (uniquement en dev)
     const mockLogin = () => {
@@ -70,11 +74,22 @@ export default function LoginScreen() {
 
     // Navigation automatique
     useEffect(() => {
-        if (accessToken) {
+        // On navigue uniquement si le token global est présent ET que Spotify confirme l'auth.
+        // Sinon, on risque d'utiliser un ancien token (désynchronisé) et de boucler/faire des 403.
+        if (accessToken && isAuthenticated) {
             console.log('[LOGIN] Global accessToken detected, navigating...');
             router.replace('/session-management');
         }
-    }, [accessToken, router]);
+    }, [accessToken, isAuthenticated, router]);
+
+    // Si Spotify n'est plus authentifié (token purgé, scopes modifiés, logout),
+    // on purge aussi le contexte global pour éviter une désynchronisation.
+    useEffect(() => {
+        if (!isSpotifyLoading && !isAuthenticated && accessToken) {
+            console.log('[LOGIN] Spotify not authenticated anymore, clearing global auth');
+            clearAuth();
+        }
+    }, [isSpotifyLoading, isAuthenticated, accessToken, clearAuth]);
 
     return (
         <View style={styles.container}>

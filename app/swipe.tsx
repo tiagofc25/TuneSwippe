@@ -13,6 +13,7 @@ import {
 import { useRouter, Stack } from "expo-router";
 import Swiper from "react-native-deck-swiper";
 import { useAuth } from "../context/AuthContext";
+import { useAuthProtection } from "../hooks/useAuthProtection";
 import { MusicTrack } from "../services/musicTypes";
 import { TrackCard } from "../components/TrackCard";
 import { Colors } from "../constants/Colors";
@@ -25,6 +26,7 @@ const { width } = Dimensions.get("window");
 
 export default function SwipeScreen() {
   const router = useRouter();
+  useAuthProtection();
   const {
     accessToken,
     user,

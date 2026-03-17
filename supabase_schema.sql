@@ -10,15 +10,22 @@ CREATE TABLE IF NOT EXISTS sessions (
   user1_id TEXT NOT NULL,
   user1_display_name TEXT,
   user1_playlist_id TEXT,
+  user1_tracks JSONB,
   
   -- Utilisateur 2 (Invité)
   user2_id TEXT,
   user2_display_name TEXT,
   user2_playlist_id TEXT,
+  user2_tracks JSONB,
   
   status TEXT DEFAULT 'waiting', -- waiting, active, finished
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Si la table existe déjà (déjà créée sans colonnes tracks), ajoute-les
+ALTER TABLE sessions
+  ADD COLUMN IF NOT EXISTS user1_tracks JSONB,
+  ADD COLUMN IF NOT EXISTS user2_tracks JSONB;
 
 -- 3. Création de la table des swipes
 CREATE TABLE IF NOT EXISTS swipes (

@@ -13,6 +13,7 @@ export interface MusicPlaylist {
     images: { url: string }[];
     trackCount: number;
     ownerName: string;
+    ownerId?: string;
     isPublic: boolean;
 }
 

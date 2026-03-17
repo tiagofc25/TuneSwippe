@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [roomCode, setRoomCode] = useState<string | null>(null);
 
     const setAuth = useCallback((token: string, musicUser: MusicUser) => {
+        console.log('[CONTEXT] Setting auth token:', token);
         setAccessToken(token);
         setUser(musicUser);
     }, []);

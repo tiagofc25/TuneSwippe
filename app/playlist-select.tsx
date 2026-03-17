@@ -9,10 +9,12 @@ import {
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useAuth } from "../context/AuthContext";
+import { useAuthProtection } from "../hooks/useAuthProtection";
+import { useSpotifyAuth } from "../hooks/useSpotifyAuth";
 import {
-  getUserPlaylists as getSpotifyPlaylists,
-  getPlaylistTracks as getSpotifyTracks,
-} from "../services/spotify";
+  getUserPlaylists,
+  getPlaylistTracks,
+} from "../services/spotifyService";
 import { MusicPlaylist } from "../services/musicTypes";
 import { PlaylistCard } from "../components/PlaylistCard";
 import { Colors } from "../constants/Colors";
@@ -22,6 +24,7 @@ import { Feather } from "@expo/vector-icons";
 
 export default function PlaylistSelectScreen() {
   const router = useRouter();
+  useAuthProtection();
   const {
     accessToken,
     user,
@@ -29,6 +32,8 @@ export default function PlaylistSelectScreen() {
     mySelectedPlaylist,
     sessionId,
   } = useAuth();
+
+  const { getValidToken, isLoading: isAuthLoading } = useSpotifyAuth();
 
   const [playlists, setPlaylists] = useState<MusicPlaylist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,17 +43,15 @@ export default function PlaylistSelectScreen() {
   // ─── Fetch playlists ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!accessToken) {
-      router.replace("/");
-      return;
-    }
+    // Attendre que l'authentification soit complète avant de charger les playlists
+    if (isAuthLoading) return;
 
     (async () => {
       try {
-        if (accessToken) {
-          const data = await getSpotifyPlaylists(accessToken, 50);
-          setPlaylists(data);
-        }
+        // Priorité au token global (évite les soucis d'instances multiples de useSpotifyAuth)
+        const tokenProvider = async () => accessToken ?? (await getValidToken());
+        const data = await getUserPlaylists(tokenProvider, 50);
+        setPlaylists(data);
       } catch (err) {
         setError("Impossible de récupérer vos playlists");
         console.error(err);
@@ -56,7 +59,7 @@ export default function PlaylistSelectScreen() {
         setIsLoading(false);
       }
     })();
-  }, [accessToken, router]);
+  }, [isAuthLoading, accessToken, getValidToken]);
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -65,17 +68,36 @@ export default function PlaylistSelectScreen() {
   };
 
   const handleContinue = async () => {
-    if (!mySelectedPlaylist || !sessionId || !user || !accessToken) return;
+    if (!mySelectedPlaylist || !sessionId || !user) return;
 
     setIsSaving(true);
     setError(null);
 
     try {
-      // 1. Fetch les tracks de MA propre playlist avec MON token
+      // Diagnostic: si le propriétaire réel de la playlist ne correspond pas au compte connecté,
+      // Spotify peut refuser l'accès aux tracks même si la playlist semble visible.
+      if (
+        mySelectedPlaylist.ownerId &&
+        mySelectedPlaylist.ownerId !== user.id
+      ) {
+        throw new Error(
+          `PLAYLIST_OWNER_MISMATCH: owner=${mySelectedPlaylist.ownerId} me=${user.id}`
+        );
+      }
+
+      console.log(
+        "[PLAYLIST-SELECT] ownerId/me:",
+        mySelectedPlaylist.ownerId ?? "(unknown)",
+        "/",
+        user.id
+      );
+
+      // 1. Fetch les tracks de MA propre playlist avec MON token (via getValidToken)
       console.log("[PLAYLIST-SELECT] Fetching own playlist tracks...");
-      const tracks = await getSpotifyTracks(
-        accessToken,
+      const tokenProvider = async () => accessToken ?? (await getValidToken());
+      const tracks = await getPlaylistTracks(
         mySelectedPlaylist.id,
+        tokenProvider,
         50
       );
 
@@ -109,7 +131,58 @@ export default function PlaylistSelectScreen() {
       router.push("/swipe");
     } catch (err) {
       console.error(err);
-      setError("Erreur lors de l'enregistrement du choix");
+      const anyErr = err as any;
+      if (
+        anyErr?.code === "PGRST204" &&
+        typeof anyErr?.message === "string" &&
+        anyErr.message.includes("user1_tracks")
+      ) {
+        setError(
+          "Ton Supabase n'a pas les colonnes `user1_tracks` / `user2_tracks` dans la table `sessions`.\n\n" +
+            "Fix: exécute ce SQL dans Supabase (SQL Editor):\n" +
+            "ALTER TABLE sessions\n" +
+            "  ADD COLUMN IF NOT EXISTS user1_tracks JSONB,\n" +
+            "  ADD COLUMN IF NOT EXISTS user2_tracks JSONB;"
+        );
+        return;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("PLAYLIST_OWNER_MISMATCH")) {
+        setError(
+          "Tu es connecté à un autre compte Spotify que le propriétaire de cette playlist.\n\n" +
+            "Solution: reconnecte-toi avec le bon compte (celui qui possède la playlist)."
+        );
+      } else if (message.includes("PLAYLIST_UNSUPPORTED_ITEMS")) {
+        setError(
+          "Cette playlist contient des morceaux que Spotify n’expose pas via l’API (souvent des « Local Files »).\n\n" +
+            "Solution: choisis une playlist composée de morceaux Spotify (pas locaux), ou enlève les fichiers locaux de la playlist."
+        );
+      } else if (message.includes("PLAYLIST_EMPTY")) {
+        setError(
+          "Cette playlist semble vide côté Spotify API (0 morceau).\n\n" +
+            "Vérifie qu'elle contient bien des morceaux Spotify (pas uniquement locaux) et que tu es connecté au bon compte."
+        );
+      } else if (message.includes("PLAYLIST_NO_SWIPABLE_ITEMS")) {
+        const details = message.split(":").slice(1).join(":");
+        setError(
+          "Impossible de récupérer des morceaux « swipables » depuis Spotify pour cette playlist.\n\n" +
+            "Souvent: playlist vide côté API, ou composée de contenus non exposés (Local Files).\n" +
+            (details ? `\nDétail: ${details}` : "")
+        );
+      } else if (message.includes("403_FORBIDDEN")) {
+        const details = message.includes(":") ? message.split(":").slice(1).join(":") : "";
+        setError(
+          "Spotify refuse l’accès à cette playlist (403).\n\n" +
+            "Causes fréquentes :\n" +
+            "• Autorisation Spotify sans les bons scopes → reconnecte-toi\n" +
+            "• App Spotify en mode Développement → ajoute ton compte en « test user » dans le Dashboard\n"
+            + (details ? `\nDétail Spotify: ${details}` : "")
+        );
+      } else if (message.includes("401_UNAUTHORIZED")) {
+        setError("Session Spotify expirée. Reconnecte-toi.");
+      } else {
+        setError("Erreur lors de l'enregistrement du choix");
+      }
     } finally {
       setIsSaving(false);
     }

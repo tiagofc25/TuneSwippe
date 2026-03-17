@@ -13,6 +13,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, Stack } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useAuthProtection } from '../hooks/useAuthProtection';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
 import { MusicButton } from '../components/MusicButton';
@@ -22,6 +23,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 export default function SessionManagementScreen() {
     const router = useRouter();
     const { user, setSessionId, setRoomCode, sessionId } = useAuth();
+    useAuthProtection();
 
     const [mode, setMode] = useState<'root' | 'create' | 'join' | 'code-display'>('root');
     const [inputValue, setInputValue] = useState('');

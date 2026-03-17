@@ -13,11 +13,13 @@ import {
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useAuth } from "../context/AuthContext";
+import { useAuthProtection } from "../hooks/useAuthProtection";
+import { useSpotifyAuth } from "../hooks/useSpotifyAuth";
 import { supabase } from "../lib/supabase";
 import {
-  createSharedPlaylist as createSpotifyPlaylist,
-  addTracksToPlaylist as addSpotifyTracks,
-} from "../services/spotify";
+  createSharedPlaylist,
+  addTracksToPlaylist,
+} from "../services/spotifyService";
 import { MusicTrack } from "../services/musicTypes";
 import { Colors } from "../constants/Colors";
 import { MusicButton } from "../components/MusicButton";
@@ -26,13 +28,15 @@ import { LinearGradient } from "expo-linear-gradient";
 
 export default function MatchesScreen() {
   const router = useRouter();
+  useAuthProtection();
   const {
-    accessToken,
     user,
     sessionId,
     mySelectedPlaylist,
     partnerPlaylistId,
   } = useAuth();
+
+  const { getValidToken } = useSpotifyAuth();
 
   const [matches, setMatches] = useState<MusicTrack[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +72,7 @@ export default function MatchesScreen() {
   }, [pulse]);
 
   useEffect(() => {
-    if (!sessionId || !accessToken || !user) {
+    if (!sessionId || !user) {
       router.replace("/session-management");
       return;
     }
@@ -162,19 +166,23 @@ export default function MatchesScreen() {
   };
 
   const handleExport = async () => {
-    if (!accessToken || !user || matches.length === 0) return;
+    if (!user || matches.length === 0) return;
 
     setExporting(true);
     try {
       const playlistName = `TuneSwippe Matchs`;
+      const tokenProvider = async () => (await getValidToken());
 
-      const newPlaylist = await createSpotifyPlaylist(
-        accessToken,
+      const newPlaylist = await createSharedPlaylist(
         user.id,
-        playlistName
+        playlistName,
+        tokenProvider
       );
-      const trackUris = matches.map((t) => (t as any).uri || "");
-      await addSpotifyTracks(accessToken, newPlaylist.id, trackUris);
+      // Spotify n'accepte pas les "local files" (spotify:local:...) dans une playlist.
+      const trackUris = matches
+        .map((t) => (t as any).uri || "")
+        .filter((uri) => uri && !uri.startsWith("spotify:local:"));
+      await addTracksToPlaylist(newPlaylist.id, trackUris, tokenProvider);
       setExportedId(newPlaylist.id);
       Alert.alert("Succès !", "Ta playlist de matchs a été créée sur Spotify.");
     } catch (err) {
