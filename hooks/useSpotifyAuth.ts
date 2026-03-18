@@ -211,11 +211,14 @@ export function useSpotifyAuth() {
                         AsyncStorage.getItem(STORAGE_KEYS.SCOPES),
                     ]);
 
-                // Si les scopes ne correspondent plus, on force un nouveau login.
-                if (storedScopes && storedScopes !== SCOPES) {
-                    await logout();
-                    return null;
-                }
+                // Dans useSpotifyAuth.ts, remplace la comparaison de scopes partout par :
+const normalizeScopes = (s: string) => s.split(' ').sort().join(' ');
+
+if (storedScopes && normalizeScopes(storedScopes) !== normalizeScopes(SCOPES)) {
+  console.log('[AUTH] Scopes modifiés → purge du token');
+  await logout();
+  return null;
+}
 
                 if (accessToken && tokenExpiry) {
                     const expiry = Number(tokenExpiry);

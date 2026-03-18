@@ -159,7 +159,7 @@ export default function SwipeScreen() {
         !!myTracks
       );
 
-      if (myTracks && myTracks.length > 0 && isMounted) {
+if (myTracks !== null && myTracks !== undefined && isMounted) {
         setTracks(myTracks);
         setWaitingForPartner(false);
         setLoading(false);
@@ -207,7 +207,7 @@ export default function SwipeScreen() {
             ? session.user1_tracks
             : session.user2_tracks;
 
-          if (myTracks && myTracks.length > 0 && isMounted) {
+if (myTracks !== null && myTracks !== undefined && isMounted) {
             setTracks(myTracks);
             setWaitingForPartner(false);
             setLoading(false);
