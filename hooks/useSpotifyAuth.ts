@@ -87,7 +87,8 @@ export function useSpotifyAuth() {
                 if (accessToken && refreshToken && tokenExpiry) {
                     // Si les scopes demandés ont changé depuis le dernier login,
                     // on purge et on force un nouveau consentement.
-                    if (storedScopes && storedScopes !== SCOPES) {
+                    const normalizeScopes = (s: string) => s.split(' ').sort().join(' ');
+if (storedScopes && normalizeScopes(storedScopes) !== normalizeScopes(SCOPES)) {
                         console.log(
                             '[AUTH] Scopes modifiés depuis le dernier login → purge du token'
                         );
